@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh">
+<link rel="stylesheet" href="./css/style.css"/>
+<meta charset="utf-8"/>
+
+<style>
+    #divURL { padding-top: 20px; }
+    #divResult { padding-top: 20px; }
+
+    table {
+        margin: auto;
+        border: none;
+    }
+
+    table tr {
+        width: 99%;
+        padding: 0;
+        margin: 0;
+    }
+
+    table th {
+        background-color: #ccc;
+        width: 200px;
+        padding: 0;
+        margin: 0;
+    }
+
+    table td {
+        background-color: aquamarine;
+        padding: 0;
+        margin: 0;
+    }
+</style>
+
+<!-- <script src="js/loadbar.js"></script> -->
+<!-- <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script> -->
+<script src="js/jquery.js"></script>
+<script src="js/libjrt.js"></script>
+<script>
+    // AJAX完成, 填充表单
+    function fill(res) {
+        $("#divResult td").remove()
+        var tr = $("#divResult tr")
+
+        tr.each(function () {
+            if (this.innerText.trim() === "")
+                this.remove()
+        })
+
+        for (var i = 0; i < res.available.audios.length; i ++ ) {
+            var r = res.available.audios[i]
+            row = $(`<tr>
+                <td><input class="td" id="audio${ r.id }" value="${ r.id }" name="selectedAudio" type="radio" style="height: 20px"></td>
+                <td><a href="javascript: void(0)" onclick="window.download('/youtube/download?v=${ res.v }&format=${ r.id }')">${ r.id }</a></td>
+                <td>${ r.format }</td>
+                <td>${ r.rate }</td>
+                <td>${ r.size }</td>
+                <td>${ r.info }</td>
+            </tr>`)
+            row.appendTo("table#audios")
+            if (r.id === res.best.audio.id) {
+                $(`#audio${ r.id }`).click()
+            }
+        }
+
+        for (var i = 0; i < res.available.videos.length; i ++ ) {
+            var r = res.available.videos[i]
+            row = $(`<tr>
+                <td><input class="td" id="video${ r.id }" value="${ r.id }" name="selectedVideo" type="radio" style="height: 20px"></td>
+                <td><a href="javascript: void(0)" onclick="window.download('/youtube/download?v=${ res.v }&format=${ r.id }')">${ r.id }</a></td>
+                <td>${ r.format }</td>
+                <td>${ r.scale }</td>
+                <td>${ r.rate }</td>
+                <td>${ r.size }</td>
+                <td>${ r.info }</td>
+            </tr>`)
+            row.appendTo("table#videos")
+            if (r.id === res.best.video.id) {
+                $(`#video${ r.id }`).click()
+            }
+        }
+
+        // Display
+        //$("#divResult").css("display", "block")
+        $("#divResult").fadeIn()
+
+        $("span#recode").bind("click", fun => {
+            download(null, `/youtube/download?v=${ res.v }`) // got v, select a, v format & recode ($("table input:checked"))
+        })
+    }
+
+    parse = fun => {
+        $("#divResult").fadeOut()
+        var url = $('input#url')[0].value
+        var id = Develon.notifyID // 获取即将弹出的通知框ID
+        var parseRequest = $.ajax({
+            url: "/youtube/parse?" + url,
+            success: fun => {
+                if (fun.success === false) {
+                    Develon.notify(fun.error)
+                    Develon.removeNotify(id)
+                    return
+                }
+                // Develon.notify("解析完成")
+                Develon.removeNotify(id)
+                fill(fun.result)
+            },
+            error: fun => {
+                if (fun.readyState === 0) {
+                    Develon.notify("已取消请求") // 连接被重置时都会导致错误
+                    Develon.removeNotify(id)
+                    return
+                }
+                Develon.notify("解析失败, 请稍后再试")
+                Develon.removeNotify(id)
+            }
+        })
+        Develon.notifyWait("正在解析, 请稍等", fun => {
+            parseRequest.abort()
+            return true
+        })
+    }
+
+    function download(uri, recode_uri) {
+        if (typeof uri !== "string") {
+            var listFormat = ["mp4", "mkv", "flv", "avi", "webm", "auto"]
+            var tmpHTML = ""
+            for (var i = 0; i < listFormat.length; i++) {
+                tmpHTML += `<tr onclick="javascript: $('#format_${ listFormat[i] }').prop('checked', true)">
+                    <td style="background-color: white"><input checked="checked" id="format_${ listFormat[i] }" type="radio" name="recode" value="${ listFormat[i] }"></td>
+                    <td style="background-color: white; font-weight: bold; cursor: pointer">${ listFormat[i] }</td></tr>`
+            }
+            Develon.confirm(`<span>选择要合并的格式</span><br>
+                <table id="" style="margin: auto; background-color: white">
+                    ${ tmpHTML }
+                </table>`, fun => {
+                    var inputs = $("table input:checked")
+                    var vid = null
+                    var aid = null
+                    var recode = "auto"
+                    for (var i = 0; i < inputs.length; i ++ ) {
+                        if (inputs[i].name === "selectedVideo") vid = inputs[i].value
+                        if (inputs[i].name === "selectedAudio") aid = inputs[i].value
+                        if (inputs[i].name === "recode") recode = inputs[i].value
+                    }
+                    uri = recode_uri + `&format=${ vid }x${ aid }`
+                    if (recode !== "auto") uri += `&recode=${ recode }`
+                    console.log(`正在请求${ uri }`)
+                    postDownload(uri)
+            })
+            return
+        }
+        Develon.confirm("确认只下载音频或无声视频吗?", fun => {
+            console.log(`正在请求${uri}`)
+            postDownload(uri)
+            return true
+        })
+    }
+
+    function postDownload(uri) {
+        var notifyID = Develon.notifyID
+        console.log(`提交下载${ uri }`)
+        var req = {
+            url: uri,
+            success: fun => {
+                console.log(`轮询结果`)
+                console.log(fun)
+                if (!fun.success) {
+                    Develon.removeNotify(notifyID)
+                    Develon.notify(`下载失败!<br>${ fun.error }`)
+                    return
+                }
+                if (!fun.result.downloading && !fun.result.downloadSucceed) {
+                    Develon.removeNotify(notifyID)
+                    Develon.notify(`下载失败!<br>${ fun.result.metadata }`)
+                    return
+                }
+                if (!fun.result.downloading && fun.result.downloadSucceed) {
+                    Develon.removeNotify(notifyID)
+                    Develon.confirm(`合并完成, 点击确定下载`, fun2 => {
+                        window.open(`/${ fun.result.dest }`)
+                        return false;
+                    })
+                    return
+                }
+                // fun.result.downloading
+                window.setTimeout(fun => {
+                    $.ajax(req)
+                }, 2000)
+            },
+            error: fun => {
+                Develon.removeNotify(notifyID)
+                if (fun.readyState === 0) Develon.notify("下载已取消")
+                else Develon.notify("未知错误")
+            },
+        }
+        var reqAjax = $.ajax(req)
+        Develon.notifyWait(`稍等`, fun => {
+            reqAjax.abort()
+            return true
+        })
+    }
+
+    $(fun => {
+        $("input#url")[0].focus()
+    })
+</script>
+
+<body>
+    <div class="title">Youtube在线解析</div>
+    <div id="divURL" class="center">
+        <form name="parse" action="javascript: parse()">
+            <input class="search" id="url" name="url" type="url" autocomplete="off" placeholder="请在此粘贴要解析的视频URL后回车">
+        </form>
+    </div>
+
+    <div id="divResult" class="center" style="display: none">
+
+        <div>可用音频</div>
+        <table id="audios">
+            <tr>
+                <th>选中</td>
+                <th>ID</th>
+                <th>编码格式</th>
+                <th>码率(kpbs)</th>
+                <th>大小(MB)</th>
+                <th style="display: none;"></th>
+                <th colspan="2">其它</th>
+            </tr>
+        </table>
+
+        <div>可用视频</div>
+        <table id="videos">
+            <tr>
+                <th>选中</td>
+                <th>ID</th>
+                <th>编码格式</th>
+                <th>分辨率</th>
+                <th>码率(kpbs)</th>
+                <th>大小(MB)</th>
+                <th colspan="2">其它</th>
+            </tr>
+        </table>
+
+        <div style="padding: 20px 0px">
+            <span id="recode" class="button">合并 / 下载</span>
+        </div>
+    </div>
+
+    <div id="log"></div>
+</body>
+
+</html>
