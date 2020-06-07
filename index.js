@@ -7,7 +7,12 @@ const config = require('./config.json');
 function main() {
     let app = new express();
     app.use('/', express.static(`${__dirname}/webapps`));
-    app.use('/', express.static(`${__dirname}/tmp`));
+    app.use('/file', (req, res, next) => {
+        console.log(`下载${req.url}`);
+        next();
+    });
+    app.use('/file', express.static(`${__dirname}/tmp`));
+    app.use('/info', express.static(`${__dirname}/tmp`));
 
     app.get('/youtube/parse', (req, res) => {
         let url = req._parsedUrl.query;
@@ -190,13 +195,12 @@ format code  extension  resolution note
                             "v": videoID,
                             "downloading": false,
                             "downloadSucceed": true,
-                            "dest": `${path}/${dest}`,
-                            "metadata": `${path}/${videoID}.info.json`
+                            "dest": `file/${path}/${dest}`,
+                            "metadata": `info/${path}/${videoID}.info.json`
                         }
                     });
                 } catch (error) {
                     let cause = 'Unknown cause';
-                    console.log(typeof error);
                     console.log({error});
                     error.toString().split('\n').forEach(it => {
                         console.log(it);
