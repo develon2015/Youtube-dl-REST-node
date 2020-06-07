@@ -176,7 +176,7 @@ format code  extension  resolution note
                 try {
                     let dest = 'Unknown dest';
                     let ps = child_process.execSync(cmd).toString().split('\n');
-                    let regex = new RegExp(`^.*(${fullpath}/${videoID}\\.[\\w]+).*$`);
+                    let regex = new RegExp(`^.*${fullpath}/(${videoID}\\.[\\w]+).*$`);
                     ps.forEach(it => {
                         console.log(it);
                         let mr = it.match(regex);
@@ -190,7 +190,7 @@ format code  extension  resolution note
                             "v": videoID,
                             "downloading": false,
                             "downloadSucceed": true,
-                            "dest": dest,
+                            "dest": `${path}/${dest}`,
                             "metadata": `${path}/${videoID}.info.json`
                         }
                     });
