@@ -51,8 +51,27 @@ function main() {
         if (!!!format.match(/^(\d+)(?:x(\d+))?$/))
             return res.send({ "error": "Query参数format错误: 请求的音频和视频ID必须是数字, 合并格式为'视频IDx音频ID'", "success": false });
 
+        if (config.mode === '演示模式' && !!recode)
+            return res.send({ "error": "演示模式，关闭转码功能<br>本项目已使用Node.js重写<br>请克隆本项目后自行部署", "success": false });
+
         if (queue[JSON.stringify(req.query)] === undefined) {
-            //
+            // 检查磁盘空间
+            try {
+                let df = child_process.execSync(`df -h '${config.disk}'`).toString();
+                df.split('\n').forEach(it => {
+                    console.log({'空间': it});
+                    // /dev/sda2        39G   19G   19G  51% /
+                    let mr = it.match(/.*\s(\d+)%/);
+                    if (!!mr && Number.parseInt(mr[1]) > 90) {
+                        let cmd = `rm -r '${__dirname}/tmp'`;
+                        console.log({'清理空间': cmd});
+                        child_process.execSync(cmd);
+                    }
+                });
+            } catch(error) {
+                //
+            }
+
             queue[JSON.stringify(req.query)] = {
                 "success": true,
                 "result": {
