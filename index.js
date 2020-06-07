@@ -13,7 +13,8 @@ function main() {
         let info = fs.readFileSync(`${__dirname}/tmp/${req.url.replace(/\.\w+$/, '.info.json')}`).toString();
         info = JSON.parse(info);
         console.log({'标题': info.title}); // or 'fulltitle'
-        res.set({'Content-Disposition': `attachment; filename="${decodeURI(info.title)}"; filename*=UTF-8''${decodeURI(info.title)}`});
+        let ext = req.url.match(/.*(\.\w+)$/)[1];
+        res.set({'Content-Disposition': `attachment; filename="${encodeURI(info.title + ext)}"; filename*=UTF-8''${encodeURI(info.title + ext)}`});
         next();
     });
     app.use('/file', express.static(`${__dirname}/tmp`));
