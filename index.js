@@ -1,6 +1,7 @@
 const express = require('express');
 const child_process = require('child_process');
 const worker_threads = require('worker_threads');
+const fs = require('fs');
 
 const config = require('./config.json');
 
@@ -9,6 +10,8 @@ function main() {
     app.use('/', express.static(`${__dirname}/webapps`));
     app.use('/file', (req, res, next) => {
         console.log(`下载${req.url}`);
+        let info = fs.readFileSync(`${__dirname}/tmp/${req.url.replace(/\.\w+$/, '.info.json')}`).toJSON;
+        console.log({info});
         next();
     });
     app.use('/file', express.static(`${__dirname}/tmp`));
