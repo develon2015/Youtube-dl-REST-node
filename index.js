@@ -174,12 +174,12 @@ format code  extension  resolution note
                     `-o '${fullpath}/${videoID}.%(ext)s' ${recode !== undefined ? `--recode ${recode}` : ''} -k --write-info-json`;
                 console.log({ cmd });
                 try {
+                    let dest = 'Unknown dest';
                     let ps = child_process.execSync(cmd).toString().split('\n');
                     let regex = new RegExp(`^.*(${fullpath}\.[\w]+).*$`);
                     ps.forEach(it => {
                         console.log(it);
                         let mr = it.match(regex);
-                        let dest = 'Unknown dest';
                         if (!!mr) {
                             dest = mr[1];
                         }
