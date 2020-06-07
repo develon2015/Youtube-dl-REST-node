@@ -10,8 +10,10 @@ function main() {
     app.use('/', express.static(`${__dirname}/webapps`));
     app.use('/file', (req, res, next) => {
         console.log(`下载${req.url}`);
-        let info = fs.readFileSync(`${__dirname}/tmp/${req.url.replace(/\.\w+$/, '.info.json')}`).toJSON;
-        console.log({info});
+        let info = fs.readFileSync(`${__dirname}/tmp/${req.url.replace(/\.\w+$/, '.info.json')}`).toString();
+        info = JSON.parse(info);
+        console.log({'标题': info.title}); // or 'fulltitle'
+        res.set({'Content-Disposition': `attachment; filename="${decodeURI(info.title)}"; filename*=UTF-8''${decodeURI(info.title)}`});
         next();
     });
     app.use('/file', express.static(`${__dirname}/tmp`));
