@@ -86,9 +86,13 @@ function task() {
                 let audios = [], videos = [];
                 let bestAudio = {}, bestVideo = {};
 
-                // let rs = child_process.execSync(`youtube-dl -F '${msg.url}' 2> /dev/null`).toString().split('\n');
-                // 测试用数据
-                let rs = `[youtube] sbz3fOe7rog: Downloading webpage
+                let rs = [];
+                try {
+                    if (true)
+                        rs = child_process.execSync(`youtube-dl -F '${msg.url}' 2> /dev/null`).toString().split('\n');
+                    // 测试用数据
+                    else
+                        rs = `[youtube] sbz3fOe7rog: Downloading webpage
 [youtube] sbz3fOe7rog: Downloading video info webpage
 [info] Available formats for sbz3fOe7rog:
 format code  extension  resolution note
@@ -101,6 +105,12 @@ format code  extension  resolution note
 133          mp4        426x240    240p  247k , avc1.4d4015, 15fps, video only, 6.58MiB
 242          webm       426x240    240p  162k , vp9, 15fps, video only, 2.62MiB
 18           mp4        512x288    240p  355k , avc1.42001E, mp4a.40.2@ 96k (44100Hz), 9.58MiB (best)`.split('\n');
+                } catch(error) {
+                    worker_threads.parentPort.postMessage({
+                        "error": "解析失败！",
+                        "success": false
+                    });
+                }
 
                 rs.forEach(it => {
                     console.log(it);
@@ -150,6 +160,8 @@ format code  extension  resolution note
                         "available": { audios, videos }
                     }
                 });
+
+                break;
             }
 
             case 'download': {
@@ -202,6 +214,8 @@ format code  extension  resolution note
                         }
                     });
                 } // end of try
+
+                break;
             } // end of download
         } // end of switch
     });
