@@ -195,12 +195,12 @@ format code  extension  resolution note
                         }
                     });
                 } catch (error) {
+                    let cause = 'Unknown cause';
                     console.log(typeof error);
                     console.log({error});
                     error.toString().split('\n').forEach(it => {
                         console.log(it);
                         let mr = it.match(/^.*(ERROR.*)$/);
-                        let cause = 'Unknown cause';
                         if (!!mr) {
                             cause = mr[1];
                         }
