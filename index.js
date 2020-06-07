@@ -7,8 +7,9 @@ const config = require('./config.json');
 function main() {
     let app = new express();
     app.use('/', express.static(`${__dirname}/webapps`));
+    app.use('/', express.static(`${__dirname}/tmp`));
 
-    app.get(/^\/youtube\/parse$/, (req, res) => {
+    app.get('/youtube/parse', (req, res) => {
         let url = req._parsedUrl.query;
         console.log({ op: '解析', url });
 
@@ -24,10 +25,45 @@ function main() {
 
         let thread = new worker_threads.Worker(__filename);
         thread.once('message', msg => {
-            console.log(JSON.stringify(msg, null, 1));
+            // console.log(JSON.stringify(msg, null, 1));
             res.send(msg);
         });
         thread.postMessage({ op: 'parse', url, videoID: mr[1] });
+    });
+
+    let queue = [];
+    app.get('/youtube/download', (req, res) => {
+        let { v, format, recode } = req.query;
+        if (!!!v.match(/^[\w-]{11}$/))
+            return res.send({ "error": "Qurey参数v错误: 请提供一个正确的Video ID", "success": false });
+
+        if (!!!format.match(/^(\d+)(?:x(\d+))?$/))
+            return res.send({ "error": "Query参数format错误: 请求的音频和视频ID必须是数字, 合并格式为'视频IDx音频ID'", "success": false });
+
+        if (queue[JSON.stringify(req.query)] === undefined) {
+            //
+            queue[JSON.stringify(req.query)] = {
+                "success": true,
+                "result": {
+                    "v": v,
+                    "downloading": true,
+                    "downloadSucceed": false,
+                    "dest": "正在下载中",
+                    "metadata": ""
+                }
+            };
+
+            let thread = new worker_threads.Worker(__filename);
+            thread.once('message', msg => {
+                // 下载成功或失败，更新queue
+                console.log(JSON.stringify(msg, null, 1));
+                queue[JSON.stringify(req.query)] = msg;
+            });
+            thread.postMessage({ op: 'download', videoID: v, format, recode });
+        }
+
+        console.log(queue);
+        res.send(queue[JSON.stringify(req.query)]);
     });
 
     app.listen(config.port, config.address, () => {
@@ -67,6 +103,7 @@ format code  extension  resolution note
 18           mp4        512x288    240p  355k , avc1.42001E, mp4a.40.2@ 96k (44100Hz), 9.58MiB (best)`.split('\n');
 
                 rs.forEach(it => {
+                    console.log(it);
                     let videoRegex = /^(\d+)\s+(\w+)\s+(\d+x\d+)\s+(\d+)p\s+(\d+)k , (.*), video only, (.+)MiB$/;
                     let mr = it.match(videoRegex);
                     if (!!mr) {
@@ -99,8 +136,8 @@ format code  extension  resolution note
                 // sort
                 audios.sort((a, b) => a.rate - b.rate);
                 videos.sort((a, b) => a.rate - b.rate);
-                bestAudio = audios[audios.length -1];
-                bestVideo = videos[videos.length -1];
+                bestAudio = audios[audios.length - 1];
+                bestVideo = videos[videos.length - 1];
 
                 worker_threads.parentPort.postMessage({
                     "success": true,
@@ -114,9 +151,59 @@ format code  extension  resolution note
                     }
                 });
             }
+
             case 'download': {
-            }
-        }
+                let { videoID, format, recode } = msg;
+                const path = `${__dirname}/tmp/${videoID}/${format}`;
+                let cmd = //`cd '${__dirname}' && (cd tmp > /dev/null || (mkdir tmp && cd tmp)) &&` +
+                    `youtube-dl 'https://www.youtube.com/watch?v=${videoID}' -f ${format.replace('x', '+')} ` +
+                    `-o '${path}/${videoID}.%(ext)s' ${recode !== undefined ? `--recode ${recode}` : ''} -k --write-info-json`;
+                console.log({ cmd });
+                try {
+                    let ps = child_process.execSync(cmd).toString().split('\n');
+                    let regex = new RegExp(`^.*(${path}\.[\w]+).*$`);
+                    ps.forEach(it => {
+                        console.log(it);
+                        let mr = it.match(regex);
+                        let dest = 'Unknown dest';
+                        if (!!mr) {
+                            dest = mr[1];
+                        }
+                    });
+                    worker_threads.parentPort.postMessage({
+                        "success": true,
+                        "result": {
+                            "v": videoID,
+                            "downloading": false,
+                            "downloadSucceed": true,
+                            "dest": dest,
+                            "metadata": `${path}/${videoID}.info.json`
+                        }
+                    });
+                } catch (error) {
+                    console.log(typeof error);
+                    console.log({error});
+                    error.toString().forEach(it => {
+                        console.log(it);
+                        let mr = it.match(/^.*(ERROR.*)$/);
+                        let cause = 'Unknown cause';
+                        if (!!mr) {
+                            cause = mr[1];
+                        }
+                    });
+                    worker_threads.parentPort.postMessage({
+                        "success": true,
+                        "result": {
+                            "v": "demoVideoID",
+                            "downloading": false,
+                            "downloadSucceed": false,
+                            "dest": "下载失败",
+                            "metadata": cause
+                        }
+                    });
+                } // end of try
+            } // end of download
+        } // end of switch
     });
 }
 
