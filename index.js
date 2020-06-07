@@ -56,13 +56,14 @@ function main() {
             let thread = new worker_threads.Worker(__filename);
             thread.once('message', msg => {
                 // 下载成功或失败，更新queue
+                console.log('下载成功或失败，更新queue');
                 console.log(JSON.stringify(msg, null, 1));
                 queue[JSON.stringify(req.query)] = msg;
             });
             thread.postMessage({ op: 'download', videoID: v, format, recode });
         }
 
-        console.log(queue);
+        // console.log(queue);
         res.send(queue[JSON.stringify(req.query)]);
     });
 
@@ -131,7 +132,7 @@ format code  extension  resolution note
                     videoRegex = /^(\d+)\s+(\w+)\s+(\d+x\d+)\s+(?:[^,]+)\s+(\d+)k , (.*), video.*$/;
                     mr = it.match(videoRegex);
                     if (!!mr) {
-                        let video = getVideo(mr[1], mr[2], mr[3], 0, mr[4], mr[5], 0);
+                        let video = getVideo(mr[1], mr[2], mr[3], 0, mr[4], mr[5], '未知');
                         return videos.push(video);
                     }
 
@@ -166,14 +167,15 @@ format code  extension  resolution note
 
             case 'download': {
                 let { videoID, format, recode } = msg;
-                const path = `${__dirname}/tmp/${videoID}/${format}`;
+                const path = `${videoID}/${format}`;
+                const fullpath = `${__dirname}/tmp/${path}`;
                 let cmd = //`cd '${__dirname}' && (cd tmp > /dev/null || (mkdir tmp && cd tmp)) &&` +
                     `youtube-dl 'https://www.youtube.com/watch?v=${videoID}' -f ${format.replace('x', '+')} ` +
-                    `-o '${path}/${videoID}.%(ext)s' ${recode !== undefined ? `--recode ${recode}` : ''} -k --write-info-json`;
+                    `-o '${fullpath}/${videoID}.%(ext)s' ${recode !== undefined ? `--recode ${recode}` : ''} -k --write-info-json`;
                 console.log({ cmd });
                 try {
                     let ps = child_process.execSync(cmd).toString().split('\n');
-                    let regex = new RegExp(`^.*(${path}\.[\w]+).*$`);
+                    let regex = new RegExp(`^.*(${fullpath}\.[\w]+).*$`);
                     ps.forEach(it => {
                         console.log(it);
                         let mr = it.match(regex);
@@ -195,7 +197,7 @@ format code  extension  resolution note
                 } catch (error) {
                     console.log(typeof error);
                     console.log({error});
-                    error.toString().forEach(it => {
+                    error.toString().split('\n').forEach(it => {
                         console.log(it);
                         let mr = it.match(/^.*(ERROR.*)$/);
                         let cause = 'Unknown cause';
